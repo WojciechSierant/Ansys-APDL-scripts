@@ -1,0 +1,173 @@
+!TOOL BY WOJCIECH SIERANT
+!INSTRUKCJA:
+! 1. Otworz baze .db i wybierz komponent, w ktorym wezly chcesz porownywac
+! 2. Skopiuj pliki RST do jednego folderu z baza .db
+! 3. skopiuj nazwy plikow RST (bez rozszerzen) do zmiennych BSL_RST, NC_RST
+! 4. Uruchom ten plik w bazie .db i zaznacz pierwszy wezel. Zaznacz tylko jeden wezel na raz. Numery wezlow z bazie BSL i NC musza sie pokrywac
+! 5. Podaj nazwe wezla w '', ta nazwa bedzie pozniej widoczna w pliku. Max 8 znakow
+! 6. Zdecyduj czy chcesz wybrac kolejny wezel (1) lub zakonczyc (2). Mozesz wybrac dowolna liczne wezlow do porownania
+! 7. Plik z wynikami nazywa sie compare.dat
+
+/PREP7
+*del, all, all
+
+!XXXXXXXX GET RST XXXXXXXXXXXXX
+
+BSL_RST = 'BSL_Al_inner_FY'
+NC_RST = 'BSL_Al_inner_MX'
+
+!XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+!XXXXXXXX GET NODES XXXXXXXXXXXXX
+i = 1
+j = 1
+n = 1
+nsle
+*DIM, COMPARE_NODES, Array, 3, 6
+*DIM, NODE_NAMES, CHAR, 3, 2
+
+*DOWHILE, n
+nsle
+	*DOWHILE, i
+		nsel,r,p
+		*VGET, selected_nodes, NODE,,NLIST
+		*GET,count_nodes,'PARM',selected_nodes,DIM,X
+		*IF, count_nodes, GT, 1, THEN
+		*MSG, UI,
+		You must select only one node
+		nsle
+		*DEL, selected_nodes
+		*DEL, count_elems
+		*ELSE
+		*ASK, node_name, What is your node name ('name'), 'name'
+		*EXIT
+		*ENDIF
+	*ENDDO
+
+
+COMPARE_NODES(j, 1) = selected_nodes(1)
+NODE_NAMES(j, 1) = node_name
+NODE_NAMES(j, 2) = 'FY'
+NODE_NAMES(j+1, 2) = 'MX'
+NODE_NAMES(j+2, 2) = 'NA'
+*DEL, selected_nodes
+*DEL, node_name
+*ASK, choice, Do you want more nodes? 1 - Yes 2 - No, 2
+*IF, choice, EQ, 2, THEN
+	*EXIT
+	*ELSE
+	j = 3*n + 1
+	n = n + 1
+	*GET,COMPARE_NODES_COUNT,'PARM',COMPARE_NODES,DIM,X
+	*DIM, COMPARE_NODES_TEMP, Array, COMPARE_NODES_COUNT, 6
+	*DIM, NODE_NAMES_TEMP, CHAR, COMPARE_NODES_COUNT, 2
+	
+		*DO, l, 1, 6,1
+		*DO, k, 1, COMPARE_NODES_COUNT,1
+		COMPARE_NODES_TEMP(k, l) = COMPARE_NODES(k,l)
+		NODE_NAMES_TEMP(k, 1) = NODE_NAMES(k,1)
+		NODE_NAMES_TEMP(k, 2) = NODE_NAMES(k,2)
+		*ENDDO
+		*ENDDO
+
+		*DEL, COMPARE_NODES
+		*DEL, NODE_NAMES
+		*DIM, COMPARE_NODES, Array, COMPARE_NODES_COUNT+3, 6
+		*DIM, NODE_NAMES, CHAR, COMPARE_NODES_COUNT+3, 2
+		
+		*DO, l, 1, 6,1
+		*DO, k, 1, COMPARE_NODES_COUNT,1
+		COMPARE_NODES(k, l) = COMPARE_NODES_TEMP(k,l)
+		NODE_NAMES(k, 1) = NODE_NAMES_TEMP(k,1)
+		NODE_NAMES(k, 2) = NODE_NAMES_TEMP(k,2)
+		*ENDDO
+		*ENDDO
+
+		*DEL, COMPARE_NODES_TEMP
+		*DEL, NODE_NAMES_TEMP
+		*DEL, COMPARE_NODES_COUNT
+		*DEL, choice
+
+*ENDIF
+*ENDDO
+
+!XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+/post1
+nsle
+!XXXXXXXXXXXXXX GET VALUES XXXXXXXXXXXXXX
+FILE, BSL_RST, 'rst'
+SET, LAST
+
+*DEL,COMPARE_NODES_COUNT 
+*GET,COMPARE_NODES_COUNT,'PARM',COMPARE_NODES,DIM,X
+*DO, k,1,COMPARE_NODES_COUNT,3
+	*GET,ROTX_BSL,NODE,COMPARE_NODES(k,1),ROT,X
+	*GET,UY_BSL,NODE,COMPARE_NODES(k,1),U,Y
+	*GET,UZ_BSL,NODE,COMPARE_NODES(k,1),U,Z
+	*GET,S1_BSL,NODE,COMPARE_NODES(k,1),S,1
+	*GET,SEQV_BSL,NODE,COMPARE_NODES(k,1),S,EQV
+	COMPARE_NODES(k,2) = ROTX_BSL
+	COMPARE_NODES(k,3) = UY_BSL
+	COMPARE_NODES(k,4) = UZ_BSL
+	COMPARE_NODES(k,5) = S1_BSL/1000
+	COMPARE_NODES(k,6) = SEQV_BSL/1000
+*ENDDO
+
+FILE, NC_RST, 'rst'
+SET, LAST
+k = 1
+
+*DO, k,1, COMPARE_NODES_COUNT,3
+	*GET,ROTX_NC,NODE,COMPARE_NODES(k,1),ROT,X
+	*GET,UY_NC,NODE,COMPARE_NODES(k,1),U,Y
+	*GET,UZ_NC,NODE,COMPARE_NODES(k,1),U,Z
+	*GET,S1_NC,NODE,COMPARE_NODES(k,1),S,1
+	*GET,SEQV_NC,NODE,COMPARE_NODES(k,1),S,EQV
+	COMPARE_NODES(k+1,2) = ROTX_NC
+	COMPARE_NODES(k+1,3) = UY_NC
+	COMPARE_NODES(k+1,4) = UZ_NC
+	COMPARE_NODES(k+1,5) = S1_NC/1000
+	COMPARE_NODES(k+1,6) = SEQV_NC/1000
+*ENDDO
+
+*DO, l,2,6, 1
+*DO, k,1, COMPARE_NODES_COUNT,3
+*IF, COMPARE_NODES(k,l), NE, 0, THEN
+	COMPARE_NODES(k+2,l) = ((COMPARE_NODES(k+1,l)/COMPARE_NODES(k,l))-1)*100
+*ENDIF
+*ENDDO
+*ENDDO
+
+!XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+/output
+*CFOPEN,compare,dat
+*VWRITE,'Node Name','Node Number','','UY','ROTX','UZ','S1','SEQV'
+(A12,A16,A7,A14,A14,A14,A14,A14)
+*VWRITE,NODE_NAMES(1,1),COMPARE_NODES(1,1),NODE_NAMES(1,2),COMPARE_NODES(1,3),COMPARE_NODES(1,2),COMPARE_NODES(1,4),COMPARE_NODES(1,5),COMPARE_NODES(1,6)
+(A12,F16.0,A7,F14.9,F14.9,F14.9,F14.9,F14.9)
+*CFCLOSE
+
+*del, i
+*del, j
+*del, k
+*del, l
+*del, n
+*del, ROTX_NC
+*del, UY_NC
+*del, UZ_NC
+*del, S1_NC
+*del, SEQV_NC
+*del, ROTX_BSL
+*del, UY_BSL
+*del, UZ_BSL
+*del, S1_BSL
+*del, SEQV_BSL
+*del, COMPARE_NODES_COUNT
+*del, COMPARE_NODES
+*del, NODE_NAMES
+*del, BSL_RST
+*del, NC_RST
+*del, choice
+*del, count_nodes
+*del, node_name
