@@ -1,0 +1,162 @@
+/prep7
+csys, 4
+kdele,all
+*del,all,all
+
+/post1
+/DSCALE,ALL,OFF
+/rep
+/prep7
+
+k, , p
+
+p=0
+i=0
+t = 0
+*ASK, width, width, 0.41
+*ASK, depth, depth, 0.5
+*ASK, paths_no, number of paths, 10
+*ASK, divs, number of points, 11
+*ASK, power X, powerX, 3
+*ASK, power Y, powerY, 3
+*ASK, path_div, divisions on path, 20
+*ASK, suffix, gradient suffix, 'ULTIMATE'
+
+*abset,'CREATING GRADIENT',BOTH
+
+
+*DEL, k_points_Y
+*DIM, k_points_Y, array, paths_no, 1
+*do, i, 1, paths_no-1, 1
+
+k_points_Y(i+1,1) = -((i)**powerY)/((paths_no-1)**powerY)*width
+
+*ENDDO
+
+*DEL, k_points_X
+*DIM, k_points_X, array, divs, 1
+*do, i, 1, divs-1, 1
+
+k_points_X(i+1,1) = ((i)**powerX)/((divs-1)**powerX)*depth
+
+*ENDDO
+
+*GET,aa_knum,KP,0,NXTL
+*GET,new_k_x,KP,aa_knum,LOC,X
+*GET,new_k_y,KP,aa_knum,LOC,Y
+kdele, aa_knum
+*DEL, k_points
+*DIM, k_points, array,paths_no,divs
+*do, i, 1, paths_no, 1
+*do, j, 1, divs, 1
+t = t + 1
+k, , k_points_X(j,1)+new_k_x, k_points_Y(i,1)+new_k_y, 0
+*GET,aa_knum,KP,0,NXTL
+k_points(i,j) = aa_knum
+*ENDDO
+*ENDDO
+
+csys, 0
+*DEL, k_points_global
+*DIM, k_points_global, array, t, 4
+t = 0
+*do, i, 1, paths_no, 1
+*do, j, 1, divs, 1
+t = t + 1
+*GET,k_x,KP,k_points(i,j),LOC,X
+*GET,k_y,KP,k_points(i,j),LOC,Y
+*GET,k_z,KP,k_points(i,j),LOC,Z
+
+k_points_global(t,1) = k_points(i,j)
+k_points_global(t,2) = k_x
+k_points_global(t,3) = k_y
+k_points_global(t,4) = k_z
+
+*ENDDO
+*ENDDO
+
+
+/post1
+rsys, 4
+k_ = 0
+*do, i, 1, paths_no, 1
+*do, j, 1, divs-1, 1
+k_ = k_ + 1
+*abcheck,((k_)/(paths_no*(divs-1)))*100
+PATH, N%k_%, 2, 10, path_div
+PPATH,1,,k_points_global(k_ + i-1,2), k_points_global(k_ + i-1,3), k_points_global(k_ + i-1,4)
+PPATH,2,,k_points_global(k_ + i,2), k_points_global(k_ + i,3), k_points_global(k_ + i,4)
+PATH, N%k_%
+AVPRIN,0, ,
+PDEF, ,S,1,AVG
+PDEF, ,S,z,AVG
+PDEF, ,S,EQV,AVG
+PRPATH,S1, SZ, SEQV
+*DEL, N%k_%
+PAGET,N%k_%,TABL
+*ENDDO
+*ENDDO
+rsys, 0
+
+t=0
+y =0
+god = ((divs-1)*(path_div)*paths_no)+paths_no
+*DEL, gradient_output_divs
+*DIM, gradient_output_divs, array, god, 5
+*do, z, 1, paths_no, 1
+y =0
+*do, i, 1, divs-1, 1
+p = p + 1
+*if, i, EQ, 1, THEN
+
+	*do, x, 1, path_div+1, 1
+t = t+1
+y = y +1
+*if, y, EQ, 1, THEN
+*ELSE
+gradient_output_divs(t,1) = ((k_points_X(i+1,1) - k_points_X(i,1))/path_div)+gradient_output_divs(y-1,1)
+*ENDIF
+gradient_output_divs(t,2) = -k_points_Y(z,1)
+gradient_output_divs(t,3) = N%p%(x, 5)/1000
+gradient_output_divs(t,4) = N%p%(x, 6)/1000
+gradient_output_divs(t,5) = N%p%(x, 7)/1000
+*enddo
+*ELSE
+!!!!
+	*do, x, 1, path_div, 1
+t = t+1
+y = y +1
+*if, y, EQ, 1, THEN
+*ELSE
+gradient_output_divs(t,1) = ((k_points_X(i+1,1) - k_points_X(i,1))/path_div)+gradient_output_divs(y-1,1)
+*ENDIF
+gradient_output_divs(t,2) = -k_points_Y(z,1)
+gradient_output_divs(t,3) = N%p%(x+1, 5)/1000
+gradient_output_divs(t,4) = N%p%(x+1, 6)/1000
+gradient_output_divs(t,5) = N%p%(x+1, 7)/1000
+*enddo
+*ENDIF
+*enddo
+*enddo
+
+file_name_S1='s1_grad'
+file_name_S1=STRCAT(file_name_S1,suffix)
+file_name_S1_out=STRCAT(file_name_S1,'.out')
+
+/sys, del file_name_S1_out
+*cfopen,file_name_S1,out,,append
+*vwrite,gradient_output_divs(1,1),gradient_output_divs(1,2), gradient_output_divs(1,3)
+(F10.6,1x,F10.6,1x,F10.3)
+*cfclose
+
+file_name_SZ='sZ_grad_EQV'
+file_name_SZ=STRCAT(file_name_SZ,suffix)
+file_name_SZ_out=STRCAT(file_name_SZ,'.out')
+
+/sys, del file_name_SZ_out
+*cfopen,file_name_SZ,out,,append
+*vwrite,gradient_output_divs(1,1),gradient_output_divs(1,2), gradient_output_divs(1,4), gradient_output_divs(1,5)
+(F10.6,1x,F10.6,1x,F10.3,1x,F10.3)
+*cfclose
+
+*abfinish
